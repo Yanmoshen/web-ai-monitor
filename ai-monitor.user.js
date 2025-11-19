@@ -73,7 +73,7 @@
         position: fixed;
         top: 80px;
         right: 20px;
-        background: linear-gradient(135deg, rgba(30, 30, 40, 0.95) 0%, rgba(40, 40, 50, 0.95) 100%);
+        background: linear-gradient(135deg, ${theme.bg1} 0%, ${theme.bg2} 100%);
         color: #e0e0e0;
         padding: 12px 16px;
         border-radius: 16px;
@@ -82,13 +82,14 @@
         z-index: 999999;
         min-width: 220px;
         max-width: 280px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(100, 150, 255, 0.3);
-        border: 1px solid rgba(100, 150, 255, 0.2);
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 0 1px ${theme.primary}4D;
+        border: 1px solid ${theme.primary}33;
         backdrop-filter: blur(10px);
     `;
     
     // 添加二次元人物背景和样式
     const style = document.createElement('style');
+    style.id = 'ai-monitor-custom-style';
     style.textContent = `
         @keyframes subtle-glow {
             0%, 100% { box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(100, 150, 255, 0.3); }
@@ -297,8 +298,8 @@
         wasteTimeDiv.style.borderTop = `1px solid ${newTheme.primary}33`;
         wasteTimeDiv.style.background = `${newTheme.primary}0D`;
         
-        // 更新动画样式
-        const styleEl = document.querySelector('style');
+        // 更新动画样式 - 只更新脚本自己的style标签
+        const styleEl = document.getElementById('ai-monitor-custom-style');
         if (styleEl) {
             styleEl.textContent = `
                 @keyframes subtle-glow {
