@@ -546,6 +546,8 @@
     let completionTimeout = null;
     let isCompleting = false;
     let realtimeTimer = null;
+    let lastTextLength = 0;
+    let textGrowthCount = 0;
     
     // localStorage 键名
     const STORAGE_KEY = 'ai_monitor_stats_' + config.name;
@@ -1490,6 +1492,10 @@
     let lastResponseText = '';
     let observedInputArea = false;
     
+    // 用于标记是否检测到思考状态
+    let thinkingDetected = false;
+    let thinkingEndTime = null;
+    
     // 开始监控
     function startMonitoring() {
         startTime = Date.now();
@@ -1499,6 +1505,10 @@
         lastResponseText = '';
         isCompleting = false;
         completionTimeout = null;
+        lastTextLength = 0; // 重置文本长度
+        textGrowthCount = 0; // 重置增长计数
+        thinkingDetected = false; // 重置思考检测标记
+        thinkingEndTime = null;
         updateStatus('等待响应...', config.warningColor);
         updateTime('--');
         updateTokens('');
@@ -1506,14 +1516,19 @@
         // 启动实时计时器
         if (realtimeTimer) {
             clearInterval(realtimeTimer);
+            realtimeTimer = null;
         }
         realtimeTimer = setInterval(() => {
-            if (isMonitoring && startTime) {
+            if (isMonitoring && startTime && !firstTokenReceived) {
                 const elapsed = Date.now() - startTime;
                 updateTime(elapsed);
             }
         }, 100); // 每100ms更新一次
+        
+        // ChatGPT专用：不使用MutationObserver，改用轮询检测
+        // 这样可以更精确地控制检测时机
     }
+    
 
     // 监控发送按钮
     function observeInputArea() {
@@ -1598,28 +1613,73 @@
         });
     }
 
-    // 监控AI响应
+    // 用于存储MutationObserver实例
+    let messageObserver = null;
+    
+    // 监控AI响应 - 使用MutationObserver实时监控DOM变化
     function monitorMessages() {
+        // 定时检查方法（作为备用）
         setInterval(() => {
             if (isMonitoring) {
                 let latestMessage = null;
                 let text = '';
+                let hasStartedOutput = false;
                 
-                // ChatGPT 方法
+                // ChatGPT 专用检测逻辑
                 if (isChatGPT) {
+                    // 关键检测：查找"立即回答"按钮
+                    // 如果存在这个按钮，说明还在思考中，不应该检测内容
+                    let isStillThinking = false;
+                    
+                    // 遍历所有按钮，查找包含"立即回答"或"Respond now"文本的按钮
+                    const allButtons = document.querySelectorAll('button');
+                    for (const btn of allButtons) {
+                        const btnText = btn.textContent || '';
+                        if (btnText.includes('立即回答') || btnText.includes('Respond now')) {
+                            isStillThinking = true;
+                            break;
+                        }
+                    }
+                    
+                    // 如果还在思考中（存在"立即回答"按钮），不检测内容
+                    if (isStillThinking) {
+                        // 继续计时，但不检测内容
+                        return;
+                    }
+                    
+                    // 思考已结束（没有"立即回答"按钮），开始检测真实内容
                     const messages = document.querySelectorAll('[data-message-author-role="assistant"]');
                     if (messages.length > 0) {
                         latestMessage = messages[messages.length - 1];
-                        text = latestMessage.textContent || '';
+                        
+                        // 查找markdown容器中的内容
+                        const markdownContainer = latestMessage.querySelector('.markdown');
+                        
+                        if (markdownContainer) {
+                            // 检测<p>标签
+                            const paragraphs = markdownContainer.querySelectorAll('p');
+                            
+                            if (paragraphs.length > 0) {
+                                const firstParagraph = paragraphs[0];
+                                const paragraphText = firstParagraph.textContent || '';
+                                
+                                // 只要有1个字符就认为开始输出
+                                if (paragraphText.trim().length >= 1) {
+                                    text = Array.from(paragraphs).map(p => p.textContent || '').join('');
+                                    hasStartedOutput = true;
+                                }
+                            }
+                        }
                     }
                 }
                 
-                // Gemini 方法
-                if (!text && isGemini) {
+                // Gemini 专用检测逻辑（参考gemini-monitor.user.js）
+                if (isGemini) {
                     const messages = document.querySelectorAll(config.messageSelector);
                     if (messages.length > 0) {
                         latestMessage = messages[messages.length - 1];
                         text = latestMessage.textContent || '';
+                        hasStartedOutput = true; // Gemini没有思考状态，有文本就是开始输出
                     }
                     
                     // Gemini备用方法
@@ -1628,19 +1688,46 @@
                         if (contentDivs.length > 0) {
                             latestMessage = contentDivs[contentDivs.length - 1];
                             text = latestMessage.textContent || '';
+                            hasStartedOutput = true;
                         }
                     }
                 }
                 
-                // 处理找到的响应 - 只有当内容长度>10时才认为是真正的响应
-                if (text && text.trim().length > 10) {
-                    // 首次收到有意义的内容
+                // 检测是否真正开始输出（不是思考状态）
+                const currentLength = text.trim().length;
+                
+                // ChatGPT: 1个字符即可；Gemini: 需要>10个字符
+                const minLength = isChatGPT ? 1 : 10;
+                
+                // 如果检测到开始输出标记，且有实际内容
+                if (hasStartedOutput && currentLength >= minLength) {
+                    if (currentLength > lastTextLength) {
+                        lastTextLength = currentLength;
+                        textGrowthCount++;
+                    }
+                    
+                    // 首次检测到真正的输出（不是思考状态）
                     if (!firstTokenReceived && startTime) {
                         const responseTime = Date.now() - startTime;
+                        firstTokenReceived = true;
+                        
+                        // 停止实时计时器
+                        if (realtimeTimer) {
+                            clearInterval(realtimeTimer);
+                            realtimeTimer = null;
+                        }
+                        
+                        // 显示从发送问题到首字输出的总时间（包括思考时间）
                         updateTime(responseTime);
                         updateStatus('接收中...', config.primaryColor);
-                        firstTokenReceived = true;
                     }
+                }
+                
+                // ChatGPT: 1个字符即可；Gemini: 需要>10个字符
+                const minContentLength = isChatGPT ? 1 : 10;
+                
+                // 处理找到的响应
+                if (text && text.trim().length >= minContentLength) {
                     
                     // 内容有变化，更新显示
                     if (text !== lastResponseText) {
