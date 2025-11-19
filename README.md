@@ -49,7 +49,7 @@
 - 安装 [Tampermonkey](https://www.tampermonkey.net/) 浏览器扩展
 
 ### 安装步骤
-1. 点击 [安装脚本](https://github.com/YOUR_USERNAME/ai-monitor/raw/main/ai-monitor.user.js)
+1. 点击 [安装脚本](https://github.com/Yanmoshen/web-ai-monitor/raw/main/ai-monitor.user.js)
 2. Tampermonkey 会自动打开安装页面
 3. 点击"安装"按钮
 4. 访问 [Gemini](https://gemini.google.com) 或 [ChatGPT](https://chatgpt.com) 即可使用
@@ -170,7 +170,7 @@ Support 12 color themes:
 - Install [Tampermonkey](https://www.tampermonkey.net/) browser extension
 
 ### Installation Steps
-1. Click [Install Script](https://github.com/YOUR_USERNAME/ai-monitor/raw/main/ai-monitor.user.js)
+1. Click [Install Script](https://github.com/Yanmoshen/web-ai-monitor/raw/main/ai-monitor.user.js)
 2. Tampermonkey will automatically open the installation page
 3. Click the "Install" button
 4. Visit [Gemini](https://gemini.google.com) or [ChatGPT](https://chatgpt.com) to use
