@@ -545,6 +545,7 @@
     let firstTokenReceived = false;
     let completionTimeout = null;
     let isCompleting = false;
+    let realtimeTimer = null;
     
     // localStorage 键名
     const STORAGE_KEY = 'ai_monitor_stats_' + config.name;
@@ -1501,6 +1502,17 @@
         updateStatus('等待响应...', config.warningColor);
         updateTime('--');
         updateTokens('');
+        
+        // 启动实时计时器
+        if (realtimeTimer) {
+            clearInterval(realtimeTimer);
+        }
+        realtimeTimer = setInterval(() => {
+            if (isMonitoring && startTime) {
+                const elapsed = Date.now() - startTime;
+                updateTime(elapsed);
+            }
+        }, 100); // 每100ms更新一次
     }
 
     // 监控发送按钮
@@ -1654,6 +1666,12 @@
                                 isMonitoring = false;
                                 isCompleting = false;
                                 completionTimeout = null;
+                                
+                                // 停止实时计时器
+                                if (realtimeTimer) {
+                                    clearInterval(realtimeTimer);
+                                    realtimeTimer = null;
+                                }
                             } else {
                                 isCompleting = false;
                             }
